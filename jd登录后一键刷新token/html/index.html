@@ -1,0 +1,147 @@
+<!--
+ * @Description: 
+ * @Author: FBZ
+ * @Date: 2022-05-10 11:40:35
+ * @LastEditors: FBZ
+ * @LastEditTime: 2022-05-10 15:38:54
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>京东触屏版</title>
+    <script type="text/javascript">
+      window.alert = console.log
+    </script>
+    <script>
+      window._PFM_TIMING = [['777', new Date()]]
+      window.errorJsUmpBiz = [64, 1, 59]
+    </script>
+    <script>
+      // badjs处理
+      var __empty = function () {}
+      window.getNetWorkCallback = __empty
+      window.vivoNewsDetailPage = { getNewsReadStatus4Vivo: __empty }
+      window.BestpayReceiveFromNative = __empty
+      window.goToGetres = __empty
+      window.setWebViewFlag = __empty
+      window.processRandomSelector = __empty
+      window.insertStyle = __empty
+    </script>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="x5-cache" content="disable" />
+    <meta http-equiv="x-dns-prefetch-control" content="on" />
+    <script type="text/javascript">
+      function __reloadResource(c) {
+        try {
+          var l = document.head || document.getElementsByTagName('head')[0]
+          var b = 'wq.360buyimg.com'
+          var d = /img\d{1,2}.360buyimg.com/
+          if (c && /link/i.test(c.tagName)) {
+            if (!c.href || c.href.indexOf(b) == -1) {
+              return
+            }
+            var a = document.createElement('link')
+            a.rel = 'stylesheet'
+            a.href = c.href.replace(b, 'wqimg.jd.com')
+            l.appendChild(a)
+          }
+          if (c && /script/i.test(c.tagName)) {
+            if (!c.src || c.src.indexOf(b) == -1) {
+              return
+            }
+            var e = document.createElement('script')
+            e.type = 'text/javascript'
+            e.src = c.src.replace(b, 'wqimg.jd.com')
+            l.appendChild(e)
+          }
+          if (c && /img/i.test(c.tagName)) {
+            if (!c.src || !d.test(c.src)) {
+              return
+            }
+            c.src = c.src
+              .replace(d, 'wqimg.jd.com/imgproxy')
+              .replace('.jpg.jpg', '.jpg')
+              .replace('.png.png', '.png')
+          }
+        } catch (e) {}
+      }
+    </script>
+    <meta name="format-detection" content="telephone=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no, viewport-fit=cover"
+    />
+
+    <script type="text/javascript">
+      ~(function () {
+        var u = navigator.userAgent.toLowerCase()
+        if (u.indexOf('micromessenger') == -1 || u.indexOf('android') == -1)
+          return
+        var matchs = u.match(/micromessenger\/(\d+)\./)
+        if (matchs && matchs[1] < 8) {
+          var meta = document.createElement('meta')
+          meta.setAttribute('name', 'x5-cache')
+          meta.setAttribute('content', 'disable')
+          var head = document.head || document.getElementsByTagName('head')[0]
+          head.appendChild(meta)
+        }
+      })()
+    </script>
+
+    <script type="text/javascript">
+      window._PFM_TIMING[1] = new Date()
+      var _ua = window.navigator.userAgent.toLowerCase()
+      window.isQuickApp = /com.jd.quickapp/.test(_ua)
+      window.isViomiFridge = /provider\/viomifridge21face/.test(_ua)
+      window.isWopayWallet = /wopaywallet/.test(_ua)
+    </script>
+
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    // <script
+    //   src="https://code.jquery.com/jquery-3.6.0.slim.min.js"
+    //   integrity="sha256-u7e5khyithlIdTpu22PHhENmPcRdFiHRjhAuHcs05RI="
+    //   crossorigin="anonymous"
+    // ></script>
+    <script
+			  src="https://code.jquery.com/jquery-2.2.4.min.js"
+			  integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44="
+			  crossorigin="anonymous"></script>
+    <style>
+      html,
+      body {
+        height: 100%;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+      }
+      #btn {
+        position: fixed;
+        bottom: 32px;
+        right: 16px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <button id="btn">发送cookie</button>
+    <iframe
+      src="https://m.jd.com/"
+      width="100%"
+      height="100%"
+      frameborder="0"
+      referrerpolicy="unsafe-url"
+    ></iframe>
+    <script>
+      $('#btn').click(function () {
+        $.ajax({
+          url: 'https://fbztest.echoymm.cn/refresh-token',
+          type: 'post',
+        })
+      })
+    </script>
+  </body>
+</html>
