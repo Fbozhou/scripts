@@ -8,7 +8,7 @@
 // @include           *://weibo.cn/*
 // @exclude           *://weibo.com/tv*
 // @grant             none
-// @version           3.3
+// @version           3.4
 // @author            fbz
 // @description       去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @description:zh    去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
@@ -557,7 +557,7 @@
 
               var ngWordInMyText = ngList.some(
                 (word) =>
-                  myText.includes(word) || cur.user.screen_name.includes(word)
+                  myText.includes(word) || cur.user?.screen_name?.includes(word)
               ) // 原用户推文 || 用户名中是否含有屏蔽词
 
               if (ngWordInMyText) return acc
@@ -568,7 +568,7 @@
                 var ngWordInOriText = ngList.some(
                   (word) =>
                     oriText.includes(word) ||
-                    cur.retweeted_status.user.screen_name.includes(word)
+                    cur.retweeted_status?.user?.screen_name?.includes(word)
                 ) // 转发者微博或者原微博包含关键词
 
                 if (ngWordInOriText) return acc
