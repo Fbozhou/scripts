@@ -8,14 +8,14 @@
 // @include           *://weibo.cn/*
 // @exclude           *://weibo.com/tv*
 // @grant             none
-// @version           3.4
+// @version           3.5
 // @author            fbz
 // @description       去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @description:zh    去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @require           https://unpkg.com/ajax-hook@2.0.3/dist/ajaxhook.js
 // ==/UserScript==
 /* jshint esversion: 6 */
-;(function () {
+(function () {
   /*添加样式*/
   var css = `
     #add_ngList_btn {
@@ -53,7 +53,7 @@
       top: calc(50% - 8px);
       left: calc(50% - 1px);
     }
-    
+
     .my-dialog__wrapper {
       position: fixed;
       top: 0;
@@ -302,7 +302,7 @@
     .input_container .el-input {
       margin-right: 12px;
     }
-    
+
     .tips {
       margin-top: 24px;
       font-size: 12px;
@@ -312,8 +312,8 @@
   /*添加样式*/
   function addStyle(css) {
     if (!css) return
-    var head = document.querySelector('head')
-    var style = document.createElement('style')
+    var head = document.querySelector('head');
+    var style = document.createElement("style");
     style.type = 'text/css'
     style.innerHTML = css
     head.appendChild(style)
@@ -354,11 +354,11 @@
 
   /*生成添加屏蔽关键词的按钮*/
   function createngListBtn() {
-    var btn = document.createElement('div')
+    var btn = document.createElement("div")
     btn.title = '添加屏蔽关键词'
-    var span = document.createElement('span')
+    var span = document.createElement("span");
     span.innerText = ''
-    btn.appendChild(span)
+    btn.appendChild(span);
     btn.id = 'add_ngList_btn'
     document.body.appendChild(btn)
 
@@ -396,12 +396,10 @@
     document.body.appendChild(wrapper)
 
     /*初始化事件*/
-    document
-      .querySelector('.my-dialog__headerbtn')
-      .addEventListener('click', function () {
-        // 关闭按钮点击事件
-        hideDialog()
-      })
+    document.querySelector('.my-dialog__headerbtn').addEventListener('click', function () {
+      // 关闭按钮点击事件
+      hideDialog()
+    })
     document.querySelector('#add_btn').addEventListener('click', function () {
       // 添加关键词按钮点击事件
       var ngWord_input = document.querySelector('#ngWord_input')
@@ -426,7 +424,7 @@
   function setNgListToDom(list) {
     var nodeStr = ''
     for (var [i, item] of list.entries()) {
-      nodeStr += `<span class="ng_item">${item}<i class="close-icon" data-index=${i}></i></span>`
+      nodeStr += (`<span class="ng_item">${item}<i class="close-icon" data-index=${i}></i></span>`)
     }
     var ngListNode = document.querySelector('#ngList')
     if (ngListNode) {
@@ -452,7 +450,7 @@
   initDialog() // 初始化弹窗
 
   var data = {
-    ngList: [],
+    ngList: []
   }
 
   Object.defineProperty(data, 'ngList', {
@@ -464,7 +462,7 @@
       ngList = value || []
       setNgList(ngList)
       setNgListToDom(ngList)
-    },
+    }
   })
 
   window.addEventListener('load', function () {
@@ -478,7 +476,7 @@
     // 观察器的配置（需要观察什么变动）
     const config = {
       childList: true,
-      subtree: true,
+      subtree: true
     }
     // 当观察到变动时执行的回调函数
     const callback = function (mutationsList, observer) {
@@ -506,8 +504,7 @@
   ah.proxy({
     // 请求发起前进入
     onRequest: (config, handler) => {
-      if (!apiBlackList.some((item) => config.url.toString().includes(item)))
-        // 不在接口黑名单里的请求才放行
+      if (!apiBlackList.some(item => config.url.toString().includes(item))) // 不在接口黑名单里的请求才放行
         handler.next(config)
     },
     // 请求发生错误时进入，比如超时；注意，不包括http状态码错误，如404仍然会认为请求成功
@@ -516,10 +513,10 @@
     },
     // 请求成功后进入
     onResponse: (response, handler) => {
-      var url =
-        typeof response.config.url === 'string' ? response.config.url : '' // 防止报错，部分接口这个url返回的是个对象
+      var url = typeof response.config.url === 'string' ? response.config.url : '' // 防止报错，部分接口这个url返回的是个对象
       var res = response.response
       if (url.includes('friends') && res) {
+        // 过滤微博
         res = JSON.parse(res)
         ngList = getNgList()
 
@@ -530,16 +527,14 @@
             if (cur.user.following || cur.screen_name_suffix_new) {
               var myText = cur.text // 本人推的内容
 
-              var ngWordInMyText = ngList.some((word) => myText.includes(word)) // 原用户推文中是否含有屏蔽词
+              var ngWordInMyText = ngList.some(word => myText.includes(word)) // 原用户推文中是否含有屏蔽词
 
               if (ngWordInMyText) return acc
 
               if (cur.retweeted_status) {
                 // 如果是转推，判断原博是否包含屏蔽关键词
                 var oriText = cur.retweeted_status.text
-                var ngWordInOriText = ngList.some((word) =>
-                  oriText.includes(word)
-                )
+                var ngWordInOriText = ngList.some(word => oriText.includes(word))
 
                 if (ngWordInOriText) return acc
               }
@@ -555,21 +550,14 @@
             if (cur.user.following || cur.screen_name_suffix_new) {
               var myText = cur.text // 本人推的内容
 
-              var ngWordInMyText = ngList.some(
-                (word) =>
-                  myText.includes(word) || cur.user?.screen_name?.includes(word)
-              ) // 原用户推文 || 用户名中是否含有屏蔽词
+              var ngWordInMyText = ngList.some(word => myText.includes(word) || cur.user?.screen_name?.includes(word)) // 原用户推文 || 用户名中是否含有屏蔽词
 
               if (ngWordInMyText) return acc
 
               if (cur.retweeted_status) {
                 // 如果是转推，判断原博是否包含屏蔽关键词
                 var oriText = cur.retweeted_status.text
-                var ngWordInOriText = ngList.some(
-                  (word) =>
-                    oriText.includes(word) ||
-                    cur.retweeted_status?.user?.screen_name?.includes(word)
-                ) // 转发者微博或者原微博包含关键词
+                var ngWordInOriText = ngList.some(word => oriText.includes(word) || cur.retweeted_status?.user?.screen_name?.includes(word)) // 转发者微博或者原微博包含关键词
 
                 if (ngWordInOriText) return acc
               }
@@ -580,9 +568,26 @@
           }, [])
         }
         response.response = JSON.stringify(res)
+      } else if (url.includes('buildComments') && res) {
+        res = JSON.parse(res)
+        ngList = getNgList()
+        // 过滤评论
+        res.data = res.data.reduce((acc, cur) => {
+          cur.comments = cur.comments.reduce((acc1, cur1) => {
+            if (!ngList.some(word => cur1.text.includes(word) || cur1.user?.screen_name?.includes(word))) {
+              acc1.push(cur1)
+            }
+            return acc1
+          }, [])
+          if (!ngList.some(word => cur.text.includes(word) || cur.user?.screen_name?.includes(word))) {
+            acc.push(cur)
+          }
+          return acc
+        }, [])
+        response.response = JSON.stringify(res)
       }
 
       handler.next(response)
-    },
+    }
   })
 })()
