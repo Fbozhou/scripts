@@ -8,7 +8,7 @@
 // @include           *://weibo.cn/*
 // @exclude           *://weibo.com/tv*
 // @grant             none
-// @version           3.6
+// @version           3.7
 // @author            fbz
 // @description       去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @description:zh    去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
@@ -554,7 +554,7 @@
           res.statuses = res.statuses.reduce((acc, cur) => {
             // 仅保留已关注用户以及快转的微博
             if (cur.user.following || cur.screen_name_suffix_new) {
-              var myText = cur.text // 本人推的内容
+              var myText = cur.text || '' // 本人推的内容
 
               var ngWordInMyText = ngList.some(
                 (word) =>
@@ -565,7 +565,7 @@
 
               if (cur.retweeted_status) {
                 // 如果是转推，判断原博是否包含屏蔽关键词
-                var oriText = cur.retweeted_status.text
+                var oriText = cur.retweeted_status.text || ''
                 var ngWordInOriText = ngList.some(
                   (word) =>
                     oriText.includes(word) ||
@@ -591,7 +591,7 @@
               if (
                 !ngList.some(
                   (word) =>
-                    cur1.text.includes(word) ||
+                    cur1?.text?.includes(word) ||
                     cur1.user?.screen_name?.includes(word)
                 )
               ) {
@@ -605,7 +605,7 @@
                 if (
                   !ngList.some(
                     (word) =>
-                      cur1.text.includes(word) ||
+                      cur1?.text?.includes(word) ||
                       cur1.user?.screen_name?.includes(word)
                   )
                 ) {
@@ -618,7 +618,8 @@
           if (
             !ngList.some(
               (word) =>
-                cur.text.includes(word) || cur.user?.screen_name?.includes(word)
+                cur?.text?.includes(word) ||
+                cur.user?.screen_name?.includes(word)
             )
           ) {
             acc.push(cur)
