@@ -8,11 +8,11 @@
 // @include           *://weibo.cn/*
 // @exclude           *://weibo.com/tv*
 // @grant             none
-// @version           3.7
+// @version           3.8
 // @author            fbz
 // @description       去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @description:zh    去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
-// @require           https://unpkg.com/ajax-hook@2.0.3/dist/ajaxhook.js
+// @require           https://unpkg.com/ajax-hook@3.0.3/dist/ajaxhook.js
 // ==/UserScript==
 /* jshint esversion: 6 */
 ;(function () {
@@ -338,7 +338,7 @@
           </button>
         </div>
         <div id="ngList"></div>
-        <p class="tips">注：1. 可过滤包含屏蔽词的用户&微博。 2. 关键词保存在本地的local storage中。 3. 更改关键词后刷新页面生效（不刷新页面的情况下，只有之后加载的微博才会生效）。</p>
+        <p class="tips">注：1. 可过滤包含屏蔽词的用户、微博、评论、热搜。 2. 关键词保存在本地的local storage中。 3. 更改关键词后刷新页面生效（不刷新页面的情况下，只有之后加载的微博才会生效）。</p>
       </div>
       <div class="my-dialog__footer"></div>
     </div>
@@ -482,10 +482,17 @@
     }
     // 当观察到变动时执行的回调函数
     const callback = function (mutationsList, observer) {
-      var audioList = document.querySelectorAll('.AfterPatch_bg_34rqc')
-      for (var audio of audioList) {
+      const audioList = document.querySelectorAll('.AfterPatch_bg_34rqc')
+      for (const audio of audioList) {
         audio.remove()
         console.log('移除了弱智三连')
+      }
+      const hotSearches = window.location.href.includes('/hot/search') ? document.querySelectorAll('.vue-recycle-scroller__item-view') : []
+      for (const hotSearch of hotSearches) {
+        const text = hotSearch.innerText
+        if (ngList.some((word) => text.includes(word))) {
+          hotSearch.style.visibility = 'hidden'
+        }
       }
     }
 
@@ -496,7 +503,7 @@
     observer.observe(targetNode, config)
   }
 
-  var ngList = getNgList() // 屏蔽词列表
+  let ngList = getNgList() // 屏蔽词列表
   if (!ngList) {
     initNgList()
     ngList = getNgList()
@@ -516,116 +523,81 @@
     },
     // 请求成功后进入
     onResponse: (response, handler) => {
-      var url =
-        typeof response.config.url === 'string' ? response.config.url : '' // 防止报错，部分接口这个url返回的是个对象
-      var res = response.response
-      if (url.includes('friends') && res) {
-        // 过滤微博
+      const url =
+      typeof response.config.url === 'string' ? response.config.url : ''
+      let res = response.response
+      
+      if (res) {
         res = JSON.parse(res)
-        ngList = getNgList()
+        const ngList = getNgList()
+        const containsNgWord = (text) =>
+          ngList.some((word) => text.includes(word))
 
-        if (url.includes('m.weibo.cn')) {
-          //移动端m.weibo.cn
-          res.data.statuses = res.data.statuses.reduce((acc, cur) => {
-            // 仅保留已关注用户以及快转的微博
+        const filterStatuses = (statuses) => {
+          return statuses.reduce((acc, cur) => {
             if (cur.user.following || cur.screen_name_suffix_new) {
-              var myText = cur.text // 本人推的内容
+              const myText = cur.text || ''
+              const ngWordInMyText =
+                containsNgWord(myText) ||
+                (cur.user?.screen_name && containsNgWord(cur.user.screen_name))
 
-              var ngWordInMyText = ngList.some((word) => myText.includes(word)) // 原用户推文中是否含有屏蔽词
+              if (!ngWordInMyText) {
+                if (cur.retweeted_status) {
+                  const oriText = cur.retweeted_status.text || ''
+                  const ngWordInOriText =
+                    containsNgWord(oriText) ||
+                    (cur.retweeted_status?.user?.screen_name &&
+                      containsNgWord(cur.retweeted_status.user.screen_name))
 
-              if (ngWordInMyText) return acc
-
-              if (cur.retweeted_status) {
-                // 如果是转推，判断原博是否包含屏蔽关键词
-                var oriText = cur.retweeted_status.text
-                var ngWordInOriText = ngList.some((word) =>
-                  oriText.includes(word)
-                )
-
-                if (ngWordInOriText) return acc
+                  if (ngWordInOriText) return acc
+                }
+                acc.push(cur)
               }
-
-              acc.push(cur)
             }
             return acc
           }, [])
-        } else {
-          //电脑端
-          res.statuses = res.statuses.reduce((acc, cur) => {
-            // 仅保留已关注用户以及快转的微博
-            if (cur.user.following || cur.screen_name_suffix_new) {
-              var myText = cur.text || '' // 本人推的内容
+        }
 
-              var ngWordInMyText = ngList.some(
-                (word) =>
-                  myText.includes(word) || cur.user?.screen_name?.includes(word)
-              ) // 原用户推文 || 用户名中是否含有屏蔽词
-
-              if (ngWordInMyText) return acc
-
-              if (cur.retweeted_status) {
-                // 如果是转推，判断原博是否包含屏蔽关键词
-                var oriText = cur.retweeted_status.text || ''
-                var ngWordInOriText = ngList.some(
-                  (word) =>
-                    oriText.includes(word) ||
-                    cur.retweeted_status?.user?.screen_name?.includes(word)
-                ) // 转发者微博或者原微博包含关键词
-
-                if (ngWordInOriText) return acc
+        const filterComments = (comments) => {
+          return comments.reduce((acc, cur) => {
+            if (
+              !containsNgWord(cur.text) &&
+              !(cur.user?.screen_name && containsNgWord(cur.user.screen_name))
+            ) {
+              if (cur.comments) {
+                cur.comments = filterComments(cur.comments)
+              } else if (cur.reply_comment?.comment_badge) {
+                cur.reply_comment.comment_badge = filterComments(
+                  cur.reply_comment.comment_badge
+                )
               }
-
               acc.push(cur)
             }
             return acc
           }, [])
         }
-        response.response = JSON.stringify(res)
-      } else if (url.includes('buildComments') && res) {
-        res = JSON.parse(res)
-        ngList = getNgList()
-        // 过滤评论
-        res.data = res.data.reduce((acc, cur) => {
-          if (cur.comments) {
-            cur.comments = cur.comments.reduce((acc1, cur1) => {
-              if (
-                !ngList.some(
-                  (word) =>
-                    cur1?.text?.includes(word) ||
-                    cur1.user?.screen_name?.includes(word)
-                )
-              ) {
-                acc1.push(cur1)
-              }
-              return acc1
-            }, [])
-          } else if (cur?.reply_comment?.comment_badge) {
-            cur.reply_comment.comment_badge =
-              cur.reply_comment.comment_badge.reduce((acc1, cur1) => {
-                if (
-                  !ngList.some(
-                    (word) =>
-                      cur1?.text?.includes(word) ||
-                      cur1.user?.screen_name?.includes(word)
-                  )
-                ) {
-                  acc1.push(cur1)
-                }
-                return acc1
-              }, [])
-          }
 
-          if (
-            !ngList.some(
-              (word) =>
-                cur?.text?.includes(word) ||
-                cur.user?.screen_name?.includes(word)
-            )
-          ) {
-            acc.push(cur)
+        const filterSearchBand = (searchBands) => {
+          return searchBands.reduce((acc, cur) => {
+            if (!containsNgWord(cur.word)) {
+              acc.push(cur)
+            }
+            return acc
+          }, [])
+        }
+
+        if (url.includes('friendstimeline')) {
+          if (url.includes('m.weibo.cn')) {
+            res.data.statuses = filterStatuses(res.data.statuses)
+          } else {
+            res.statuses = filterStatuses(res.statuses)
           }
-          return acc
-        }, [])
+        } else if (url.includes('buildComments')) {
+          res.data = filterComments(res.data)
+        } else if (url.includes('searchBand')) {
+          res.data.realtime = filterSearchBand(res.data.realtime)
+        }
+
         response.response = JSON.stringify(res)
       }
 
