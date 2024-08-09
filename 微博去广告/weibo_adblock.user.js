@@ -9,7 +9,7 @@
 // @include           *://weibo.cn/*
 // @exclude           *://weibo.com/tv*
 // @grant             none
-// @version           3.9
+// @version           4.0
 // @author            fbz
 // @description       去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @description:zh    去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
@@ -385,7 +385,7 @@
 
   // 设置屏蔽词值
   function setNgList(list) {
-    // return localStorage.setItem(NgListKey, JSON.stringify(list))
+    localStorage.setItem(NgListKey, JSON.stringify(list))
     return Cookies.set(NgListKey, JSON.stringify(list), {
       domain: '.weibo.com',
       sameSite: 'none',
@@ -399,7 +399,6 @@
     const initList = JSON.parse(localStorage.getItem(NgListKey))
     if (initList && initList.length > 0) {
       setNgList(initList)
-      localStorage.removeItem(NgListKey)
     } else {
       setNgList([])
     }
