@@ -5,14 +5,17 @@
 // @match             *://*.weibo.com/*
 // @match             *://*.weibo.cn/*
 // @include           *://weibo.com/*
+// @include           *://s.weibo.com/*
 // @include           *://weibo.cn/*
 // @exclude           *://weibo.com/tv*
 // @grant             none
-// @version           3.8
+// @version           3.9
 // @author            fbz
 // @description       去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @description:zh    去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
+// @run-at            document-start
 // @require           https://unpkg.com/ajax-hook@3.0.3/dist/ajaxhook.js
+// @require           https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js
 // ==/UserScript==
 /* jshint esversion: 6 */
 ;(function () {
@@ -375,17 +378,31 @@
 
   // 获取屏蔽词列表
   function getNgList() {
-    return JSON.parse(localStorage.getItem(NgListKey))
+    // return JSON.parse(localStorage.getItem(NgListKey))
+    const res = Cookies.get(NgListKey, { domain: '.weibo.com' })
+    return res ? JSON.parse(res) : res
   }
 
   // 设置屏蔽词值
   function setNgList(list) {
-    return localStorage.setItem(NgListKey, JSON.stringify(list))
+    // return localStorage.setItem(NgListKey, JSON.stringify(list))
+    return Cookies.set(NgListKey, JSON.stringify(list), {
+      domain: '.weibo.com',
+      sameSite: 'none',
+      secure: true,
+    })
   }
 
   // 初始化屏蔽词
   function initNgList() {
-    setNgList([])
+    // 从localhost同步到cookies
+    const initList = JSON.parse(localStorage.getItem(NgListKey))
+    if (initList && initList.length > 0) {
+      setNgList(initList)
+      localStorage.removeItem(NgListKey)
+    } else {
+      setNgList([])
+    }
   }
 
   // 初始化dialog
@@ -447,14 +464,9 @@
     }
   }
 
-  addStyle(css) // 添加样式
-  createngListBtn() // 生成按钮
-  initDialog() // 初始化弹窗
-
   var data = {
     ngList: [],
   }
-
   Object.defineProperty(data, 'ngList', {
     // 简易双向绑定
     get: function () {
@@ -468,8 +480,13 @@
   })
 
   window.addEventListener('load', function () {
-    // 屏蔽视频播放后的弱智三连语音
-    appObserverInit()
+    addStyle(css) // 添加样式
+    createngListBtn() // 生成按钮
+    initDialog() // 初始化弹窗
+    // 首页、热搜页面观察器
+    appObserverInit() // 屏蔽视频播放后的弱智三连语音、过滤热搜
+    // 搜索页观察器
+    searchObserverInit()
   })
 
   // 创建观察器
@@ -487,23 +504,46 @@
         audio.remove()
         console.log('移除了弱智三连')
       }
-      const hotSearches = window.location.href.includes('/hot/search') ? document.querySelectorAll('.vue-recycle-scroller__item-view') : []
-      for (const hotSearch of hotSearches) {
-        const text = hotSearch.innerText
-        if (ngList.some((word) => text.includes(word))) {
-          hotSearch.style.visibility = 'hidden'
-        }
-      }
     }
 
     // 创建一个观察器实例并传入回调函数
     const observer = new MutationObserver(callback)
 
     // 以上述配置开始观察目标节点
-    observer.observe(targetNode, config)
+    targetNode && observer.observe(targetNode, config)
+  }
+  function searchObserverInit() {
+    const targetNode = document.getElementById('pl_feedlist_index')
+    console.log('targetNode: ', targetNode)
+    // 观察器的配置（需要观察什么变动）
+    const config = {
+      childList: true,
+      subtree: true,
+    }
+    // 当观察到变动时执行的回调函数
+    const callback = function (mutationsList, observer) {
+      const searchList = targetNode.querySelectorAll('.card-wrap')
+      for (const search of searchList) {
+        const text = search.innerText
+        if (ngList.some((word) => text.includes(word))) {
+          search.style.display = 'none'
+        }
+      }
+    }
+
+    // 创建一个观察器实例并传入回调函数
+    const observer = new MutationObserver(callback)
+    // 以上述配置开始观察目标节点
+    if (targetNode) {
+      observer.observe(targetNode, config)
+      // 手动让搜索页变化，触发观察器
+      const span = document.createElement('span')
+      targetNode.appendChild(span)
+    }
   }
 
   let ngList = getNgList() // 屏蔽词列表
+
   if (!ngList) {
     initNgList()
     ngList = getNgList()
@@ -524,18 +564,19 @@
     // 请求成功后进入
     onResponse: (response, handler) => {
       const url =
-      typeof response.config.url === 'string' ? response.config.url : ''
+        typeof response.config.url === 'string' ? response.config.url : ''
       let res = response.response
-      
+
       if (res) {
         res = JSON.parse(res)
         const ngList = getNgList()
         const containsNgWord = (text) =>
-          ngList.some((word) => text.includes(word))
+          ngList.some((word) => text?.includes(word))
 
-        const filterStatuses = (statuses) => {
+        const filterStatuses = (statuses, isHot) => {
           return statuses.reduce((acc, cur) => {
-            if (cur.user.following || cur.screen_name_suffix_new) {
+            // 热搜允许展示未关注人
+            if (isHot || cur.user.following || cur.screen_name_suffix_new) {
               const myText = cur.text || ''
               const ngWordInMyText =
                 containsNgWord(myText) ||
@@ -585,17 +626,33 @@
             return acc
           }, [])
         }
+        const filterNews = (news) => {
+          return news.reduce((acc, cur) => {
+            if (!containsNgWord(cur.topic)) {
+              acc.push(cur)
+            }
+            return acc
+          }, [])
+        }
 
-        if (url.includes('friendstimeline')) {
+        if (url.includes('/friendstimeline') || url.includes('/hottimeline')) {
           if (url.includes('m.weibo.cn')) {
             res.data.statuses = filterStatuses(res.data.statuses)
           } else {
-            res.statuses = filterStatuses(res.statuses)
+            res.statuses = filterStatuses(
+              res.statuses,
+              url.includes('/hottimeline')
+            )
           }
-        } else if (url.includes('buildComments')) {
+        } else if (url.includes('/buildComments')) {
           res.data = filterComments(res.data)
-        } else if (url.includes('searchBand')) {
+        } else if (url.includes('/searchBand') || url.includes('/mineBand') || url.includes('/hotSearch')) {
           res.data.realtime = filterSearchBand(res.data.realtime)
+        } else if (url.includes('/entertainment')) {
+          res.data.band_list = filterSearchBand(res.data.band_list)
+        } else if (url.includes('/news')) {
+          res.data.band_list = filterNews(res.data.band_list)
+          
         }
 
         response.response = JSON.stringify(res)
