@@ -9,7 +9,7 @@
 // @include           *://weibo.cn/*
 // @exclude           *://weibo.com/tv*
 // @grant             none
-// @version           4.1
+// @version           4.2
 // @author            fbz
 // @description       去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @description:zh    去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
@@ -634,7 +634,7 @@
           }, [])
         }
 
-        if (url.includes('/friendstimeline') || url.includes('/hottimeline') || url.includes('/groupstimeline')) {
+        if (url.includes('/friendstimeline') || url.includes('/unreadfriendstimeline') || url.includes('/hottimeline') || url.includes('/groupstimeline')) {
           if (url.includes('m.weibo.cn')) {
             res.data.statuses = filterStatuses(res.data.statuses)
           } else {
