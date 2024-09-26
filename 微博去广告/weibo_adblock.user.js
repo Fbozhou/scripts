@@ -2,11 +2,7 @@
 // @name              去广告&关键词屏蔽
 // @name:zh           去广告&关键词屏蔽
 // @namespace         Violentmonkey Scripts
-// @match             *://*.weibo.com/*
-// @match             *://*.weibo.cn/*
-// @include           *://weibo.com/*
-// @include           *://s.weibo.com/*
-// @include           *://weibo.cn/*
+// @match             *://weibo.com/*
 // @exclude           *://weibo.com/tv*
 // @grant             none
 // @version           4.1
