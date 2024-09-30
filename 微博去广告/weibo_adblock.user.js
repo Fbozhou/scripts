@@ -1,15 +1,14 @@
 // ==UserScript==
 // @name              去广告&关键词屏蔽
-// @name:zh           去广告&关键词屏蔽
 // @namespace         Violentmonkey Scripts
-// @match             *://weibo.com/*
-// @exclude           *://weibo.com/tv*
-// @grant             none
-// @version           4.2
-// @author            fbz
+// @version           4.3
 // @description       去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @description:zh    去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
-// @run-at            document-start
+// @author            fbz
+// @match             *://*.weibo.com/*
+// @exclude           *://weibo.com/tv*
+// @grant             none
+// @noframes
 // @require           https://unpkg.com/ajax-hook@3.0.3/dist/ajaxhook.js
 // @require           https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js
 // ==/UserScript==
@@ -461,6 +460,7 @@
 
   var data = {
     ngList: [],
+    unProxy: null
   }
   Object.defineProperty(data, 'ngList', {
     // 简易双向绑定
@@ -506,6 +506,25 @@
 
     // 以上述配置开始观察目标节点
     targetNode && observer.observe(targetNode, config)
+    // 微博首页bug简易解决方案
+    const callback2 = function (mutationsList, observer) {
+      if (window.location.href !== 'https://weibo.com/') {
+        // 不在首页时开启proxy
+        initProxy()
+      } else {
+        // 首页关闭proxy并刷新
+        if (data.unProxy) {
+          data.unProxy()
+          window.location.reload()
+        }
+
+      }
+    }
+
+    // 观察路由变化，开启ajax-hook
+    const observer2 = new MutationObserver(callback2)
+    // 以上述配置开始观察目标节点
+    targetNode && observer2.observe(targetNode, config)
   }
   function searchObserverInit() {
     const targetNode = document.getElementById('pl_feedlist_index')
@@ -545,115 +564,118 @@
   }
   data.ngList = ngList
 
-  ah.proxy({
-    // 请求发起前进入
-    onRequest: (config, handler) => {
-      if (!apiBlackList.some((item) => config.url.toString().includes(item)))
-        // 不在接口黑名单里的请求才放行
-        handler.next(config)
-    },
-    // 请求发生错误时进入，比如超时；注意，不包括http状态码错误，如404仍然会认为请求成功
-    onError: (err, handler) => {
-      handler.next(err)
-    },
-    // 请求成功后进入
-    onResponse: (response, handler) => {
-      const url =
-        typeof response.config.url === 'string' ? response.config.url : ''
-      let res = response.response
+  function initProxy(){
+    const { unProxy } = ah.proxy({
+      // 请求发起前进入
+      onRequest: (config, handler) => {
+        if (!apiBlackList.some((item) => config.url.toString().includes(item)))
+          // 不在接口黑名单里的请求才放行
+          handler.next(config)
+      },
+      // 请求发生错误时进入，比如超时；注意，不包括http状态码错误，如404仍然会认为请求成功
+      onError: (err, handler) => {
+        handler.next(err)
+      },
+      // 请求成功后进入
+      onResponse: (response, handler) => {
+        const url =
+          typeof response.config.url === 'string' ? response.config.url : ''
+        let res = response.response
 
-      if (res) {
-        res = JSON.parse(res)
-        const ngList = getNgList()
-        const containsNgWord = (text) =>
-          ngList.some((word) => text?.includes(word))
+        if (res) {
+          res = JSON.parse(res)
+          const ngList = getNgList()
+          const containsNgWord = (text) =>
+            ngList.some((word) => text?.includes(word))
 
-        const filterStatuses = (statuses, isHot) => {
-          return statuses.reduce((acc, cur) => {
-            // 热搜允许展示未关注人
-            if (isHot || cur.user.following || cur.screen_name_suffix_new) {
-              const myText = cur.text || ''
-              const ngWordInMyText =
-                containsNgWord(myText) ||
-                (cur.user?.screen_name && containsNgWord(cur.user.screen_name))
+          const filterStatuses = (statuses, isHot) => {
+            return statuses.reduce((acc, cur) => {
+              // 热搜允许展示未关注人
+              if (isHot || cur.user.following || cur.screen_name_suffix_new) {
+                const myText = cur.text || ''
+                const ngWordInMyText =
+                  containsNgWord(myText) ||
+                  (cur.user?.screen_name && containsNgWord(cur.user.screen_name))
 
-              if (!ngWordInMyText) {
-                if (cur.retweeted_status) {
-                  const oriText = cur.retweeted_status.text || ''
-                  const ngWordInOriText =
-                    containsNgWord(oriText) ||
-                    (cur.retweeted_status?.user?.screen_name &&
-                      containsNgWord(cur.retweeted_status.user.screen_name))
+                if (!ngWordInMyText) {
+                  if (cur.retweeted_status) {
+                    const oriText = cur.retweeted_status.text || ''
+                    const ngWordInOriText =
+                      containsNgWord(oriText) ||
+                      (cur.retweeted_status?.user?.screen_name &&
+                        containsNgWord(cur.retweeted_status.user.screen_name))
 
-                  if (ngWordInOriText) return acc
+                    if (ngWordInOriText) return acc
+                  }
+                  acc.push(cur)
+                }
+              }
+              return acc
+            }, [])
+          }
+
+          const filterComments = (comments) => {
+            return comments.reduce((acc, cur) => {
+              if (
+                !containsNgWord(cur.text) &&
+                !(cur.user?.screen_name && containsNgWord(cur.user.screen_name))
+              ) {
+                if (cur.comments) {
+                  cur.comments = filterComments(cur.comments)
+                } else if (cur.reply_comment?.comment_badge) {
+                  cur.reply_comment.comment_badge = filterComments(
+                    cur.reply_comment.comment_badge
+                  )
                 }
                 acc.push(cur)
               }
-            }
-            return acc
-          }, [])
-        }
-
-        const filterComments = (comments) => {
-          return comments.reduce((acc, cur) => {
-            if (
-              !containsNgWord(cur.text) &&
-              !(cur.user?.screen_name && containsNgWord(cur.user.screen_name))
-            ) {
-              if (cur.comments) {
-                cur.comments = filterComments(cur.comments)
-              } else if (cur.reply_comment?.comment_badge) {
-                cur.reply_comment.comment_badge = filterComments(
-                  cur.reply_comment.comment_badge
-                )
-              }
-              acc.push(cur)
-            }
-            return acc
-          }, [])
-        }
-
-        const filterSearchBand = (searchBands) => {
-          return searchBands.reduce((acc, cur) => {
-            if (!containsNgWord(cur.word)) {
-              acc.push(cur)
-            }
-            return acc
-          }, [])
-        }
-        const filterNews = (news) => {
-          return news.reduce((acc, cur) => {
-            if (!containsNgWord(cur.topic)) {
-              acc.push(cur)
-            }
-            return acc
-          }, [])
-        }
-
-        if (url.includes('/friendstimeline') || url.includes('/unreadfriendstimeline') || url.includes('/hottimeline') || url.includes('/groupstimeline')) {
-          if (url.includes('m.weibo.cn')) {
-            res.data.statuses = filterStatuses(res.data.statuses)
-          } else {
-            res.statuses = filterStatuses(
-              res.statuses,
-              url.includes('/hottimeline')
-            )
+              return acc
+            }, [])
           }
-        } else if (url.includes('/buildComments')) {
-          res.data = filterComments(res.data)
-        } else if (url.includes('/searchBand') || url.includes('/mineBand') || url.includes('/hotSearch')) {
-          res.data.realtime = filterSearchBand(res.data.realtime)
-        } else if (url.includes('/entertainment')) {
-          res.data.band_list = filterSearchBand(res.data.band_list)
-        } else if (url.includes('/news')) {
-          res.data.band_list = filterNews(res.data.band_list)
-          
+
+          const filterSearchBand = (searchBands) => {
+            return searchBands.reduce((acc, cur) => {
+              if (!containsNgWord(cur.word)) {
+                acc.push(cur)
+              }
+              return acc
+            }, [])
+          }
+          const filterNews = (news) => {
+            return news.reduce((acc, cur) => {
+              if (!containsNgWord(cur.topic)) {
+                acc.push(cur)
+              }
+              return acc
+            }, [])
+          }
+
+          if (url.includes('/friendstimeline') || url.includes('/unreadfriendstimeline') || url.includes('/hottimeline') || url.includes('/groupstimeline')) {
+            if (url.includes('m.weibo.cn')) {
+              res.data.statuses = filterStatuses(res.data.statuses)
+            } else {
+              res.statuses = filterStatuses(
+                res.statuses,
+                url.includes('/hottimeline')
+              )
+            }
+          } else if (url.includes('/buildComments')) {
+            res.data = filterComments(res.data)
+          } else if (url.includes('/searchBand') || url.includes('/mineBand') || url.includes('/hotSearch')) {
+            res.data.realtime = filterSearchBand(res.data.realtime)
+          } else if (url.includes('/entertainment')) {
+            res.data.band_list = filterSearchBand(res.data.band_list)
+          } else if (url.includes('/news')) {
+            res.data.band_list = filterNews(res.data.band_list)
+
+          }
+
+          response.response = JSON.stringify(res)
         }
 
-        response.response = JSON.stringify(res)
-      }
-
-      handler.next(response)
-    },
-  })
+        handler.next(response)
+      },
+    })
+    data.unProxy = unProxy
+  }
 })()
