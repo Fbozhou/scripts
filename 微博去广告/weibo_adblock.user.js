@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name              去广告&关键词屏蔽
 // @namespace         Violentmonkey Scripts
-// @version           4.3
+// @version           4.4
 // @description       去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @description:zh    去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @author            fbz
@@ -341,15 +341,7 @@
       <div class="my-dialog__footer"></div>
     </div>
   `
-  /*按钮模板*/
-  var btn_temp = `
-    <span class="Configs_alink_2Yg6L" yawf-component-tag="woo-box">
-      <div class="woo-box-flex woo-box-alignCenter woo-pop-item-main" role="button" tabindex="0" data-focus-visible="true" yawf-component-tag="woo-pop-item woo-box">
-        屏蔽词设置
-      </div>
-    </span>
-  `
-
+  
   /*生成添加屏蔽关键词的按钮*/
   function createngListBtn() {
     var btn = document.createElement('div')
@@ -374,7 +366,7 @@
   // 获取屏蔽词列表
   function getNgList() {
     // return JSON.parse(localStorage.getItem(NgListKey))
-    const res = Cookies.get(NgListKey, { domain: '.weibo.com' })
+    var res = Cookies.get(NgListKey, { domain: '.weibo.com' })
     return res ? JSON.parse(res) : res
   }
 
@@ -391,7 +383,7 @@
   // 初始化屏蔽词
   function initNgList() {
     // 从localhost同步到cookies
-    const initList = JSON.parse(localStorage.getItem(NgListKey))
+    var initList = JSON.parse(localStorage.getItem(NgListKey))
     if (initList && initList.length > 0) {
       setNgList(initList)
     } else {
@@ -459,9 +451,9 @@
   }
 
   var data = {
-    ngList: [],
-    unProxy: null
+    ngList: []
   }
+
   Object.defineProperty(data, 'ngList', {
     // 简易双向绑定
     get: function () {
@@ -486,59 +478,39 @@
 
   // 创建观察器
   function appObserverInit() {
-    const targetNode = document.getElementById('app')
+    var targetNode = document.getElementById('app')
     // 观察器的配置（需要观察什么变动）
-    const config = {
+    var config = {
       childList: true,
       subtree: true,
     }
     // 当观察到变动时执行的回调函数
-    const callback = function (mutationsList, observer) {
-      const audioList = document.querySelectorAll('.AfterPatch_bg_34rqc')
-      for (const audio of audioList) {
+    var callback = function (mutationsList, observer) {
+      var audioList = document.querySelectorAll('.AfterPatch_bg_34rqc')
+      for (var audio of audioList) {
         audio.remove()
         console.log('移除了弱智三连')
       }
     }
 
     // 创建一个观察器实例并传入回调函数
-    const observer = new MutationObserver(callback)
+    var observer = new MutationObserver(callback)
 
     // 以上述配置开始观察目标节点
     targetNode && observer.observe(targetNode, config)
-    // 微博首页bug简易解决方案
-    const callback2 = function (mutationsList, observer) {
-      if (window.location.href !== 'https://weibo.com/') {
-        // 不在首页时开启proxy
-        initProxy()
-      } else {
-        // 首页关闭proxy并刷新
-        if (data.unProxy) {
-          data.unProxy()
-          window.location.reload()
-        }
-
-      }
-    }
-
-    // 观察路由变化，开启ajax-hook
-    const observer2 = new MutationObserver(callback2)
-    // 以上述配置开始观察目标节点
-    targetNode && observer2.observe(targetNode, config)
   }
   function searchObserverInit() {
-    const targetNode = document.getElementById('pl_feedlist_index')
-    console.log('targetNode: ', targetNode)
+    var targetNode = document.getElementById('pl_feedlist_index')
     // 观察器的配置（需要观察什么变动）
-    const config = {
+    var config = {
       childList: true,
       subtree: true,
     }
     // 当观察到变动时执行的回调函数
-    const callback = function (mutationsList, observer) {
-      const searchList = targetNode.querySelectorAll('.card-wrap')
-      for (const search of searchList) {
-        const text = search.innerText
+    var callback = function (mutationsList, observer) {
+      var searchList = targetNode.querySelectorAll('.card-wrap')
+      for (var search of searchList) {
+        var text = search.innerText
         if (ngList.some((word) => text.includes(word))) {
           search.style.display = 'none'
         }
@@ -546,17 +518,17 @@
     }
 
     // 创建一个观察器实例并传入回调函数
-    const observer = new MutationObserver(callback)
+    var observer = new MutationObserver(callback)
     // 以上述配置开始观察目标节点
     if (targetNode) {
       observer.observe(targetNode, config)
       // 手动让搜索页变化，触发观察器
-      const span = document.createElement('span')
+      var span = document.createElement('span')
       targetNode.appendChild(span)
     }
   }
 
-  let ngList = getNgList() // 屏蔽词列表
+  var ngList = getNgList() // 屏蔽词列表
 
   if (!ngList) {
     initNgList()
@@ -564,118 +536,114 @@
   }
   data.ngList = ngList
 
-  function initProxy(){
-    const { unProxy } = ah.proxy({
-      // 请求发起前进入
-      onRequest: (config, handler) => {
-        if (!apiBlackList.some((item) => config.url.toString().includes(item)))
-          // 不在接口黑名单里的请求才放行
-          handler.next(config)
-      },
-      // 请求发生错误时进入，比如超时；注意，不包括http状态码错误，如404仍然会认为请求成功
-      onError: (err, handler) => {
-        handler.next(err)
-      },
-      // 请求成功后进入
-      onResponse: (response, handler) => {
-        const url =
-          typeof response.config.url === 'string' ? response.config.url : ''
-        let res = response.response
+  function responseFilter(response) {
+    // 请求过滤方法
+    var url =
+      typeof response.responseURL === 'string' ? response.responseURL : ''
+    var res = response.response
 
-        if (res) {
-          res = JSON.parse(res)
-          const ngList = getNgList()
-          const containsNgWord = (text) =>
-            ngList.some((word) => text?.includes(word))
+    if (res) {
+      res = JSON.parse(res)
+      var ngList = getNgList()
+      var containsNgWord = (text) =>
+        ngList.some((word) => text?.includes(word))
 
-          const filterStatuses = (statuses, isHot) => {
-            return statuses.reduce((acc, cur) => {
-              // 热搜允许展示未关注人
-              if (isHot || cur.user.following || cur.screen_name_suffix_new) {
-                const myText = cur.text || ''
-                const ngWordInMyText =
-                  containsNgWord(myText) ||
-                  (cur.user?.screen_name && containsNgWord(cur.user.screen_name))
+      var filterStatuses = (statuses, isHot) => {
+        return statuses.reduce((acc, cur) => {
+          // 热搜允许展示未关注人
+          if (isHot || cur.user.following || cur.screen_name_suffix_new) {
+            var myText = cur.text || ''
+            var ngWordInMyText =
+              containsNgWord(myText) ||
+              (cur.user?.screen_name && containsNgWord(cur.user.screen_name))
 
-                if (!ngWordInMyText) {
-                  if (cur.retweeted_status) {
-                    const oriText = cur.retweeted_status.text || ''
-                    const ngWordInOriText =
-                      containsNgWord(oriText) ||
-                      (cur.retweeted_status?.user?.screen_name &&
-                        containsNgWord(cur.retweeted_status.user.screen_name))
+            if (!ngWordInMyText) {
+              if (cur.retweeted_status) {
+                var oriText = cur.retweeted_status.text || ''
+                var ngWordInOriText =
+                  containsNgWord(oriText) ||
+                  (cur.retweeted_status?.user?.screen_name &&
+                    containsNgWord(cur.retweeted_status.user.screen_name))
 
-                    if (ngWordInOriText) return acc
-                  }
-                  acc.push(cur)
-                }
+                if (ngWordInOriText) return acc
               }
-              return acc
-            }, [])
+              acc.push(cur)
+            }
           }
+          return acc
+        }, [])
+      }
 
-          const filterComments = (comments) => {
-            return comments.reduce((acc, cur) => {
-              if (
-                !containsNgWord(cur.text) &&
-                !(cur.user?.screen_name && containsNgWord(cur.user.screen_name))
-              ) {
-                if (cur.comments) {
-                  cur.comments = filterComments(cur.comments)
-                } else if (cur.reply_comment?.comment_badge) {
-                  cur.reply_comment.comment_badge = filterComments(
-                    cur.reply_comment.comment_badge
-                  )
-                }
-                acc.push(cur)
-              }
-              return acc
-            }, [])
-          }
-
-          const filterSearchBand = (searchBands) => {
-            return searchBands.reduce((acc, cur) => {
-              if (!containsNgWord(cur.word)) {
-                acc.push(cur)
-              }
-              return acc
-            }, [])
-          }
-          const filterNews = (news) => {
-            return news.reduce((acc, cur) => {
-              if (!containsNgWord(cur.topic)) {
-                acc.push(cur)
-              }
-              return acc
-            }, [])
-          }
-
-          if (url.includes('/friendstimeline') || url.includes('/unreadfriendstimeline') || url.includes('/hottimeline') || url.includes('/groupstimeline')) {
-            if (url.includes('m.weibo.cn')) {
-              res.data.statuses = filterStatuses(res.data.statuses)
-            } else {
-              res.statuses = filterStatuses(
-                res.statuses,
-                url.includes('/hottimeline')
+      var filterComments = (comments) => {
+        return comments.reduce((acc, cur) => {
+          if (
+            !containsNgWord(cur.text) &&
+            !(cur.user?.screen_name && containsNgWord(cur.user.screen_name))
+          ) {
+            if (cur.comments) {
+              cur.comments = filterComments(cur.comments)
+            } else if (cur.reply_comment?.comment_badge) {
+              cur.reply_comment.comment_badge = filterComments(
+                cur.reply_comment.comment_badge
               )
             }
-          } else if (url.includes('/buildComments')) {
-            res.data = filterComments(res.data)
-          } else if (url.includes('/searchBand') || url.includes('/mineBand') || url.includes('/hotSearch')) {
-            res.data.realtime = filterSearchBand(res.data.realtime)
-          } else if (url.includes('/entertainment')) {
-            res.data.band_list = filterSearchBand(res.data.band_list)
-          } else if (url.includes('/news')) {
-            res.data.band_list = filterNews(res.data.band_list)
-
+            acc.push(cur)
           }
+          return acc
+        }, [])
+      }
 
-          response.response = JSON.stringify(res)
+      var filterSearchBand = (searchBands) => {
+        return searchBands.reduce((acc, cur) => {
+          if (!containsNgWord(cur.word)) {
+            acc.push(cur)
+          }
+          return acc
+        }, [])
+      }
+      var filterNews = (news) => {
+        return news.reduce((acc, cur) => {
+          if (!containsNgWord(cur.topic)) {
+            acc.push(cur)
+          }
+          return acc
+        }, [])
+      }
+      if (url.includes('/friendstimeline') || url.includes('/unreadfriendstimeline') || url.includes('/hottimeline') || url.includes('/groupstimeline')) {
+        if (url.includes('m.weibo.cn')) {
+          res.data.statuses = filterStatuses(res.data.statuses)
+        } else {
+          res.statuses = filterStatuses(
+            res.statuses,
+            url.includes('/hottimeline')
+          )
         }
+      } else if (url.includes('/buildComments')) {
+        res.data = filterComments(res.data)
+      } else if (url.includes('/searchBand') || url.includes('/mineBand') || url.includes('/hotSearch')) {
+        res.data.realtime = filterSearchBand(res.data.realtime)
+      } else if (url.includes('/entertainment')) {
+        res.data.band_list = filterSearchBand(res.data.band_list)
+      } else if (url.includes('/news')) {
+        res.data.band_list = filterNews(res.data.band_list)
 
-        handler.next(response)
-      },
-    })
-    data.unProxy = unProxy
+      }
+
+      return JSON.stringify(res)
+    }
   }
+  function initHook() {
+    ah.hook({
+      onloadend: function (xhr) {
+        //拦截回调
+        this.responseText = responseFilter(xhr)
+      },
+      open: function (arg, xhr) {
+        var url = arg[1] || ''
+        //返回true则表示阻断
+        return apiBlackList.some((item) => url.toString().includes(item))
+      }
+    })
+  }
+  initHook()
 })()
