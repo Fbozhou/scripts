@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name              去广告&关键词屏蔽
 // @namespace         Violentmonkey Scripts
-// @version           4.4
+// @version           4.5
 // @description       去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @description:zh    去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @author            fbz
@@ -474,9 +474,11 @@
     appObserverInit() // 屏蔽视频播放后的弱智三连语音、过滤热搜
     // 搜索页观察器
     searchObserverInit()
+    // 热搜页观察器
+    hotObserverInit()
   })
 
-  // 创建观察器
+  // 创建首页观察器
   function appObserverInit() {
     var targetNode = document.getElementById('app')
     // 观察器的配置（需要观察什么变动）
@@ -499,6 +501,7 @@
     // 以上述配置开始观察目标节点
     targetNode && observer.observe(targetNode, config)
   }
+  // 搜索页观察器
   function searchObserverInit() {
     var targetNode = document.getElementById('pl_feedlist_index')
     // 观察器的配置（需要观察什么变动）
@@ -526,6 +529,30 @@
       var span = document.createElement('span')
       targetNode.appendChild(span)
     }
+  }
+  // 热搜页观察器
+  function hotObserverInit() {
+    var targetNode = document.getElementsByClassName('Main_full_1dfQX')[0]
+    // 观察器的配置（需要观察什么变动）
+    var config = {
+      childList: true,
+      subtree: true,
+    }
+    // 当观察到变动时执行的回调函数
+    var callback = function (mutationsList, observer) {
+      var hotList = targetNode.querySelectorAll('.vue-recycle-scroller__item-view')
+      for (var hot of hotList) {
+        var text = hot.innerText
+        if (ngList.some((word) => text.includes(word))) {
+          hot.style.opacity = 0
+        }
+      }
+    }
+
+    // 创建一个观察器实例并传入回调函数
+    var observer = new MutationObserver(callback)
+    // 以上述配置开始观察目标节点
+    targetNode && observer.observe(targetNode, config)
   }
 
   var ngList = getNgList() // 屏蔽词列表
