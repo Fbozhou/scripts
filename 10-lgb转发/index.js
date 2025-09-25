@@ -3,6 +3,14 @@ const path = require('path')
 const express = require('express')
 const { createProxyMiddleware } = require('http-proxy-middleware')
 const axios = require('axios')
+
+const http = require('http')
+const keepAliveAgent = new http.Agent({
+  keepAlive: true,
+  maxSockets: 50, // 默认 Infinity
+  maxFreeSockets: 20,
+})
+
 const app = express()
 // 通用超时时间，单位：毫秒
 const TIMEOUT = 1000 * 60 * 30
@@ -28,13 +36,13 @@ app.use((req, res, next) => {
 app.use('/api/dashboard/api/getmarketvideo', async (req, res, next) => {
   try {
     // 构造目标请求的完整 URL
-    const targetUrl = `https://lgbv3.linggongbang.cn${req.originalUrl.replace(
+    const targetUrl = `http://ptdashboard.linggongbang.cn${req.originalUrl.replace(
       '/api',
       ''
     )}`
 
     // 发起请求获取目标接口的响应
-    const response = await axios.get(targetUrl)
+    const response = await axios.get(targetUrl, { httpAgent: keepAliveAgent })
 
     // 修改响应体内容
     if (response.data && response.data.data) {
@@ -56,15 +64,22 @@ app.use('/api/dashboard/api/getmarketvideo', async (req, res, next) => {
 app.use(
   '/api',
   createProxyMiddleware({
-    target: 'https://lgbv3.linggongbang.cn',
+    target: 'http://ptdashboard.linggongbang.cn',
+    agent: keepAliveAgent,
     changeOrigin: true,
     timeout: TIMEOUT, // 设置请求超时时间（单位：毫秒）
     proxyTimeout: TIMEOUT, // 设置代理超时时间（单位：毫秒）
     pathRewrite: {
       '^/api': '', // 去掉 /api 前缀
     },
-    onProxyReq: (proxyReq) => {
-      // proxyReq.setHeader('X-Custom-Header', 'YourCustomValue')
+    onProxyReq: (proxyReq, req) => {
+      proxyReq.setHeader('Connection', 'keep-alive')
+      proxyReq.setHeader(
+        'User-Agent',
+        req.headers['user-agent'] || 'Mozilla/5.0'
+      )
+      proxyReq.setHeader('Accept', '*/*')
+      proxyReq.setHeader('Referer', req.headers.referer || serverurl)
     },
     onProxyRes: (proxyRes) => {
       console.log('api-proxyRes: ', proxyRes)
@@ -102,12 +117,13 @@ app.use('/lgb/Upload/recruit', async (req, res) => {
   }
 
   // 图片不存在，发起请求获取图片
-  const originalUrl = `http://lgbv3.linggongbang.cn/lgb/Upload/recruit${req.url}`
+  const originalUrl = `http://ptdashboard.linggongbang.cn/lgb/Upload/recruit${req.url}`
   try {
     // 第一次请求获取重定向地址
     const response = await axios.get(originalUrl, {
       maxRedirects: 0,
       validateStatus: (status) => status >= 200 && status < 400,
+      httpAgent: keepAliveAgent,
     })
 
     const redirectUrl = response.headers.location // 获取重定向地址
@@ -120,6 +136,7 @@ app.use('/lgb/Upload/recruit', async (req, res) => {
     // 第二次请求下载图片内容
     const imageResponse = await axios.get(redirectUrl, {
       responseType: 'stream', // 流式下载
+      httpAgent: keepAliveAgent,
     })
 
     // 将图片保存到本地
@@ -194,8 +211,8 @@ app.use('/images/putian/:filename', async (req, res) => {
 app.get('/public/Dashboard/index.html', async (req, res) => {
   try {
     const targetUrl =
-      'https://lgbv3.linggongbang.cn/public/Dashboard/index.html'
-    const response = await axios.get(targetUrl)
+      'http://ptdashboard.linggongbang.cn/public/Dashboard/index.html'
+    const response = await axios.get(targetUrl, { httpAgent: keepAliveAgent })
     let htmlContent = response.data
 
     // 替换静态资源地址
@@ -225,14 +242,17 @@ app.get('/public/Dashboard/index.html', async (req, res) => {
 app.get('/public/Dashboard/js/chart.js', async (req, res) => {
   try {
     const targetUrl =
-      'https://lgbv3.linggongbang.cn/public/Dashboard/js/chart.js'
-    const response = await axios.get(targetUrl)
+      'http://ptdashboard.linggongbang.cn/public/Dashboard/js/chart.js'
+    const response = await axios.get(targetUrl, { httpAgent: keepAliveAgent })
     let jsContent = response.data
 
     // 替换内部接口地址
     jsContent = jsContent
-      .replace(/https:\/\/lgbv3\.linggongbang\.cn/g, `${serverurl}/api`)
-      .replace(/http:\/\/lgbv3\.linggongbang\.cn\/lgb/g, `${serverurl}/lgb`)
+      .replace(/http:\/\/ptdashboard\.linggongbang\.cn/g, `${serverurl}/api`)
+      .replace(
+        /http:\/\/ptdashboard\.linggongbang\.cn\/lgb/g,
+        `${serverurl}/lgb`
+      )
 
     res.set('Content-Type', 'application/javascript')
     res.send(jsContent)
@@ -258,6 +278,7 @@ app.use(
   '/element-ui',
   createProxyMiddleware({
     target: 'https://unpkg.com/element-ui',
+    agent: keepAliveAgent,
     changeOrigin: true,
     timeout: TIMEOUT, // 设置请求超时时间（单位：毫秒）
     proxyTimeout: TIMEOUT, // 设置代理超时时间（单位：毫秒）
@@ -268,6 +289,7 @@ app.use(
   '/element-ui@2.15.14',
   createProxyMiddleware({
     target: 'https://unpkg.com/element-ui@2.15.14',
+    agent: keepAliveAgent,
     changeOrigin: true,
     timeout: TIMEOUT, // 设置请求超时时间（单位：毫秒）
     proxyTimeout: TIMEOUT, // 设置代理超时时间（单位：毫秒）
@@ -279,12 +301,19 @@ app.use(
 app.use(
   '/',
   createProxyMiddleware({
-    target: 'https://lgbv3.linggongbang.cn',
+    target: 'http://ptdashboard.linggongbang.cn',
+    agent: keepAliveAgent,
     changeOrigin: true,
     timeout: TIMEOUT, // 设置请求超时时间（单位：毫秒）
     proxyTimeout: TIMEOUT, // 设置代理超时时间（单位：毫秒）
-    onProxyReq: (proxyReq) => {
-      // proxyReq.setHeader('X-Custom-Header', 'YourCustomValue')
+    onProxyReq: (proxyReq, req) => {
+      proxyReq.setHeader('Connection', 'keep-alive')
+      proxyReq.setHeader(
+        'User-Agent',
+        req.headers['user-agent'] || 'Mozilla/5.0'
+      )
+      proxyReq.setHeader('Accept', '*/*')
+      proxyReq.setHeader('Referer', req.headers.referer || serverurl)
     },
     onProxyRes: (proxyRes) => {
       proxyRes.headers['Access-Control-Allow-Origin'] = '*'
