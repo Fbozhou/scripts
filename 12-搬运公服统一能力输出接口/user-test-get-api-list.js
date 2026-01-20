@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         获取测试环境机关保接口
-// @namespace    获取测试环境机关保接口
+// @name         导出测试环境机关保接口
+// @namespace    导出测试环境机关保接口
 // @version      1.0.0
-// @description  获取测试环境机关保接口并保存为json文件
+// @description  导出测试环境机关保接口并保存为json文件
 // @author       fbz
 // @match        http://10.96.235.212/tyscAdmin/*
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=235.212
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=rs.com
 // @run-at       document-end
 // @grant        none
 // ==/UserScript==

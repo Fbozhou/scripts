@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         导入测试环境接口
-// @namespace    导入测试环境接口
+// @name         导入测试环境机关保接口
+// @namespace    导入测试环境机关保接口
 // @version      1.0.0
-// @description  导入从测试环境导出的接口json并新增
+// @description  上传测试环境导出的list.json，在生产环境按serviceCode检查不存在则新增；结束自动下载日志；token从sessionStorage读取
 // @author       fbz
 // @match        http://10.96.235.94/tyscAdmin/*
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=235.94
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=rs.com
 // @run-at       document-end
 // @grant        none
 // ==/UserScript==

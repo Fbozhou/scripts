@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         导入生产环境接口到政务外网
-// @namespace    导入生产环境接口到政务外网
+// @name         导入生产环境机关保接口到政务外网
+// @namespace    导入生产环境机关保接口到政务外网
 // @version      1.0.0
 // @description  上传生产环境导出的list.json，在生产环境按serviceCode检查不存在则新增；结束自动下载日志；token从sessionStorage读取
 // @author       fbz
 // @match        http://zwfw.rst.fujian.gov.cn:8005/tyscAdmin/*
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=fujian.gov.cn
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=rs.com
 // @run-at       document-end
 // @grant        none
 // ==/UserScript==
