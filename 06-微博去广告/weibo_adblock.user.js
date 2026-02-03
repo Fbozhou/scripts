@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name              去广告&关键词屏蔽
 // @namespace         Violentmonkey Scripts
-// @version           4.5
+// @version           4.6
 // @description       去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @description:zh    去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @author            fbz
@@ -11,302 +11,304 @@
 // @noframes
 // @require           https://unpkg.com/ajax-hook@3.0.3/dist/ajaxhook.js
 // @require           https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js
+// @downloadURL https://update.greasyfork.org/scripts/428144/%E5%8E%BB%E5%B9%BF%E5%91%8A%E5%85%B3%E9%94%AE%E8%AF%8D%E5%B1%8F%E8%94%BD.user.js
+// @updateURL https://update.greasyfork.org/scripts/428144/%E5%8E%BB%E5%B9%BF%E5%91%8A%E5%85%B3%E9%94%AE%E8%AF%8D%E5%B1%8F%E8%94%BD.meta.js
 // ==/UserScript==
 /* jshint esversion: 6 */
-;(function () {
+; (function () {
   /*添加样式*/
   var css = `
-    #add_ngList_btn {
-      position: fixed;
-      bottom: 2rem;
-      left: 1rem;
-      width: 2rem;
-      height: 2rem;
-      border-radius: 50%;
-      border: 1px solid rgba(0, 0, 0, 0.5);
-      background: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      z-index: 100;
-    }
+  #add_ngList_btn {
+    position: fixed;
+    bottom: 2rem;
+    left: 1rem;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 100;
+  }
 
-    #add_ngList_btn::before {
-      content: '';
-      position: absolute;
-      width: 16px;
-      height: 2px;
-      background: rgba(0, 0, 0, 0.5);
-      top: calc(50% - 1px);
-      left: calc(50% - 8px);
-    }
+  #add_ngList_btn::before {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 2px;
+    background: rgba(0, 0, 0, 0.5);
+    top: calc(50% - 1px);
+    left: calc(50% - 8px);
+  }
 
-    #add_ngList_btn::after {
-      content: '';
-      position: absolute;
-      height: 16px;
-      width: 2px;
-      background: rgba(0, 0, 0, 0.5);
-      top: calc(50% - 8px);
-      left: calc(50% - 1px);
-    }
+  #add_ngList_btn::after {
+    content: '';
+    position: absolute;
+    height: 16px;
+    width: 2px;
+    background: rgba(0, 0, 0, 0.5);
+    top: calc(50% - 8px);
+    left: calc(50% - 1px);
+  }
 
-    .my-dialog__wrapper {
-      position: fixed;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      left: 0;
-      overflow: auto;
-      margin: 0;
-      z-index: 10000;
-      background: rgba(0, 0, 0, 0.3);
-      display: none;
-    }
+  .my-dialog__wrapper {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    overflow: auto;
+    margin: 0;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.3);
+    display: none;
+  }
 
-    .my-dialog {
-      position: relative;
-      background: #FFFFFF;
-      border-radius: 2px;
-      box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
-      box-sizing: border-box;
-      width: 50%;
-      transform: none;
-      left: 0;
-      margin: 0 auto;
-    }
+  .my-dialog {
+    position: relative;
+    background: #FFFFFF;
+    border-radius: 2px;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+    box-sizing: border-box;
+    width: 50%;
+    transform: none;
+    left: 0;
+    margin: 0 auto;
+  }
 
-    .my-dialog .my-dialog__header {
-      border-bottom: 1px solid #e4e4e4;
-      padding: 14px 16px 10px 16px;
-    }
+  .my-dialog .my-dialog__header {
+    border-bottom: 1px solid #e4e4e4;
+    padding: 14px 16px 10px 16px;
+  }
 
-    .my-dialog__title {
-      line-height: 24px;
-      font-size: 18px;
-      color: #303133;
-    }
+  .my-dialog__title {
+    line-height: 24px;
+    font-size: 18px;
+    color: #303133;
+  }
 
-    .my-dialog__headerbtn {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      padding: 0;
-      background: transparent;
-      border: none;
-      outline: none;
-      cursor: pointer;
-      font-size: 16px;
-      width: 12px;
-      height: 12px;
-      transform: rotateZ(45deg);
-    }
+  .my-dialog__headerbtn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    font-size: 16px;
+    width: 12px;
+    height: 12px;
+    transform: rotateZ(45deg);
+  }
 
-    .my-dialog .my-dialog__header .my-dialog__headerbtn {
-      right: 16px;
-      top: 16px;
-    }
+  .my-dialog .my-dialog__header .my-dialog__headerbtn {
+    right: 16px;
+    top: 16px;
+  }
 
-    .my-dialog__headerbtn .my-dialog__close::before {
-      content: '';
-      position: absolute;
-      width: 12px;
-      height: 1.5px;
-      background: #909399;
-      top: calc(50% - 0.75px);
-      left: calc(50% - 6px);
-      border-radius: 2px;
-    }
+  .my-dialog__headerbtn .my-dialog__close::before {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 1.5px;
+    background: #909399;
+    top: calc(50% - 0.75px);
+    left: calc(50% - 6px);
+    border-radius: 2px;
+  }
 
-    .my-dialog__headerbtn:hover .my-dialog__close::before {
-      background: #1890ff;
-    }
+  .my-dialog__headerbtn:hover .my-dialog__close::before {
+    background: #1890ff;
+  }
 
-    .my-dialog__headerbtn .my-dialog__close::after {
-      content: '';
-      position: absolute;
-      height: 12px;
-      width: 1.5px;
-      background: #909399;
-      top: calc(50% - 6px);
-      left: calc(50% - 0.75px);
-      border-radius: 2px;
-    }
+  .my-dialog__headerbtn .my-dialog__close::after {
+    content: '';
+    position: absolute;
+    height: 12px;
+    width: 1.5px;
+    background: #909399;
+    top: calc(50% - 6px);
+    left: calc(50% - 0.75px);
+    border-radius: 2px;
+  }
 
-    .my-dialog__headerbtn:hover .my-dialog__close::after {
-      background: #1890ff;
-    }
+  .my-dialog__headerbtn:hover .my-dialog__close::after {
+    background: #1890ff;
+  }
 
-    .my-dialog__body {
-      padding: 30px 20px;
-      color: #606266;
-      font-size: 14px;
-      word-break: break-all;
-    }
+  .my-dialog__body {
+    padding: 30px 20px;
+    color: #606266;
+    font-size: 14px;
+    word-break: break-all;
+  }
 
-    .my-dialog__footer {
-      padding: 20px;
-      padding-top: 10px;
-      text-align: right;
-      box-sizing: border-box;
-    }
+  .my-dialog__footer {
+    padding: 20px;
+    padding-top: 10px;
+    text-align: right;
+    box-sizing: border-box;
+  }
 
-    .my-dialog .my-dialog__footer {
-      padding: 0px 16px 24px 16px;
-      margin-top: 40px;
-    }
+  .my-dialog .my-dialog__footer {
+    padding: 0px 16px 24px 16px;
+    margin-top: 40px;
+  }
 
-    #ngList {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-start;
-      max-height: 480px;
-      overflow-y: scroll;
-    }
+  #ngList {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    max-height: 480px;
+    overflow-y: scroll;
+  }
 
-    .close-icon {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      display: inline-block;
-      position: relative;
-      transform: rotateZ(45deg);
-      margin-left: 8px;
-      cursor: pointer;
-    }
+  .close-icon {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    position: relative;
+    transform: rotateZ(45deg);
+    margin-left: 8px;
+    cursor: pointer;
+  }
 
-    .close-icon:hover {
-      background: #409eff;
-    }
+  .close-icon:hover {
+    background: #409eff;
+  }
 
-    .close-icon::before {
-      content: '';
-      position: absolute;
-      width: 8px;
-      height: 2px;
-      background: #409eff;
-      top: calc(50% - 1px);
-      left: calc(50% - 4px);
-      border-radius: 2px;
-    }
+  .close-icon::before {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 2px;
+    background: #409eff;
+    top: calc(50% - 1px);
+    left: calc(50% - 4px);
+    border-radius: 2px;
+  }
 
-    .close-icon:hover::before {
-      background: #fff;
-    }
+  .close-icon:hover::before {
+    background: #fff;
+  }
 
-    .close-icon::after {
-      content: '';
-      position: absolute;
-      height: 8px;
-      width: 2px;
-      background: #409eff;
-      top: calc(50% - 4px);
-      left: calc(50% - 1px);
-      border-radius: 2px;
-    }
+  .close-icon::after {
+    content: '';
+    position: absolute;
+    height: 8px;
+    width: 2px;
+    background: #409eff;
+    top: calc(50% - 4px);
+    left: calc(50% - 1px);
+    border-radius: 2px;
+  }
 
-    .close-icon:hover::after {
-      background: #fff;
-    }
+  .close-icon:hover::after {
+    background: #fff;
+  }
 
-    .ng_item {
-      background-color: #ecf5ff;
-      display: inline-flex;
-      align-items: center;
-      padding: 0 10px;
-      font-size: 12px;
-      color: #409eff;
-      border: 1px solid #d9ecff;
-      border-radius: 4px;
-      box-sizing: border-box;
-      white-space: nowrap;
-      height: 28px;
-      line-height: 26px;
-      margin-left: 12px;
-      margin-top: 8px;
-    }
+  .ng_item {
+    background-color: #ecf5ff;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 10px;
+    font-size: 12px;
+    color: #409eff;
+    border: 1px solid #d9ecff;
+    border-radius: 4px;
+    box-sizing: border-box;
+    white-space: nowrap;
+    height: 28px;
+    line-height: 26px;
+    margin-left: 12px;
+    margin-top: 8px;
+  }
 
 
-    .input_container {
-      display: flex;
-      align-items: center;
-      margin-bottom: 12px;
-    }
+  .input_container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+  }
 
-    .el-input {
-      position: relative;
-      font-size: 14px;
-      display: inline-block;
-      width: 100%;
-    }
+  .el-input {
+    position: relative;
+    font-size: 14px;
+    display: inline-block;
+    width: 100%;
+  }
 
-    .el-input__inner {
-      -webkit-appearance: none;
-      background-color: #fff;
-      background-image: none;
-      border-radius: 4px;
-      border: 1px solid #dcdfe6;
-      box-sizing: border-box;
-      color: #606266;
-      display: inline-block;
-      font-size: inherit;
-      height: 40px;
-      line-height: 40px;
-      outline: none;
-      padding: 0 15px;
-      transition: border-color .2s cubic-bezier(.645, .045, .355, 1);
-      width: 100%;
-      cursor: pointer;
-      font-family: inherit;
-    }
+  .el-input__inner {
+    -webkit-appearance: none;
+    background-color: #fff;
+    background-image: none;
+    border-radius: 4px;
+    border: 1px solid #dcdfe6;
+    box-sizing: border-box;
+    color: #606266;
+    display: inline-block;
+    font-size: inherit;
+    height: 40px;
+    line-height: 40px;
+    outline: none;
+    padding: 0 15px;
+    transition: border-color .2s cubic-bezier(.645, .045, .355, 1);
+    width: 100%;
+    cursor: pointer;
+    font-family: inherit;
+  }
 
-    .el-button {
-      display: inline-block;
-      line-height: 1;
-      white-space: nowrap;
-      cursor: pointer;
-      background: #fff;
-      border: 1px solid #dcdfe6;
-      color: #606266;
-      -webkit-appearance: none;
-      text-align: center;
-      box-sizing: border-box;
-      outline: none;
-      margin: 0;
-      transition: .1s;
-      font-weight: 500;
-      -moz-user-select: none;
-      -webkit-user-select: none;
-      -ms-user-select: none;
-      padding: 12px 20px;
-      font-size: 14px;
-      border-radius: 4px;
-    }
+  .el-button {
+    display: inline-block;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    background: #fff;
+    border: 1px solid #dcdfe6;
+    color: #606266;
+    -webkit-appearance: none;
+    text-align: center;
+    box-sizing: border-box;
+    outline: none;
+    margin: 0;
+    transition: .1s;
+    font-weight: 500;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    padding: 12px 20px;
+    font-size: 14px;
+    border-radius: 4px;
+  }
 
-    .el-button:focus,
-    .el-button:hover {
-      color: #409eff;
-      border-color: #c6e2ff;
-      background-color: #ecf5ff;
-    }
+  .el-button:focus,
+  .el-button:hover {
+    color: #409eff;
+    border-color: #c6e2ff;
+    background-color: #ecf5ff;
+  }
 
-    .el-button:active {
-      color: #3a8ee6;
-      border-color: #3a8ee6;
-      outline: none;
-    }
+  .el-button:active {
+    color: #3a8ee6;
+    border-color: #3a8ee6;
+    outline: none;
+  }
 
-    .input_container .el-input {
-      margin-right: 12px;
-    }
+  .input_container .el-input {
+    margin-right: 12px;
+  }
 
-    .tips {
-      margin-top: 24px;
-      font-size: 12px;
-      color: #F56C6C;
-    }
-  `
+  .tips {
+    margin-top: 24px;
+    font-size: 12px;
+    color: #F56C6C;
+  }
+`
   /*添加样式*/
   function addStyle(css) {
     if (!css) return
@@ -319,29 +321,29 @@
 
   /*dialog模板*/
   var dialog_temp = `
-    <div class="my-dialog" style="margin-top: 15vh; width: 40%;">
-      <div class="my-dialog__header">
-        <span class="my-dialog__title">屏蔽词列表</span>
-        <button type="button" aria-label="Close" class="my-dialog__headerbtn">
-          <i class="my-dialog__close"></i>
+  <div class="my-dialog" style="margin-top: 15vh; width: 40%;">
+    <div class="my-dialog__header">
+      <span class="my-dialog__title">屏蔽词列表</span>
+      <button type="button" aria-label="Close" class="my-dialog__headerbtn">
+        <i class="my-dialog__close"></i>
+      </button>
+    </div>
+    <div class="my-dialog__body">
+      <div class="input_container">
+        <div class="el-input">
+          <input id="ngWord_input" class="el-input__inner" type="text" />
+        </div>
+        <button type="button" class="el-button" id="add_btn">
+          <span>添加</span>
         </button>
       </div>
-      <div class="my-dialog__body">
-        <div class="input_container">
-          <div class="el-input">
-            <input id="ngWord_input" class="el-input__inner" type="text" />
-          </div>
-          <button type="button" class="el-button" id="add_btn">
-            <span>添加</span>
-          </button>
-        </div>
-        <div id="ngList"></div>
-        <p class="tips">注：1. 可过滤包含屏蔽词的用户、微博、评论、热搜。 2. 关键词保存在本地的local storage中。 3. 更改关键词后刷新页面生效（不刷新页面的情况下，只有之后加载的微博才会生效）。</p>
-      </div>
-      <div class="my-dialog__footer"></div>
+      <div id="ngList"></div>
+      <p class="tips">注：1. 可过滤包含屏蔽词的用户、微博、评论、热搜。 2. 关键词保存在本地的local storage中。 3. 更改关键词后刷新页面生效（不刷新页面的情况下，只有之后加载的微博才会生效）。</p>
     </div>
-  `
-  
+    <div class="my-dialog__footer"></div>
+  </div>
+`
+
   /*生成添加屏蔽关键词的按钮*/
   function createngListBtn() {
     var btn = document.createElement('div')
@@ -442,7 +444,7 @@
         data.ngList = arr || []
       }
       var delBtnList = ngListNode.querySelectorAll('.close-icon')
-      for (var [i, node] of delBtnList.entries()) {
+      for (let [i, node] of delBtnList.entries()) {
         node.addEventListener('click', function (el) {
           onDel(Number(el.target.dataset.index))
         })
@@ -465,8 +467,15 @@
       setNgListToDom(ngList)
     },
   })
+  function onReady(fn) {
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      fn()
+    } else {
+      document.addEventListener('DOMContentLoaded', fn)
+    }
+  }
 
-  window.addEventListener('load', function () {
+  onReady(() => {
     addStyle(css) // 添加样式
     createngListBtn() // 生成按钮
     initDialog() // 初始化弹窗
