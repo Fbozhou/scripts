@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name              去广告&关键词屏蔽
 // @namespace         Violentmonkey Scripts
-// @version           4.6
+// @version           4.7
 // @description       去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @description:zh    去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @author            fbz
@@ -586,8 +586,13 @@
 
       var filterStatuses = (statuses, isHot) => {
         return statuses.reduce((acc, cur) => {
+          var isFollowing = cur.user.following
+          var isNotPrUser = cur.is_controlled_by_server === 1 // 1是自己关注的，2是服务器推送的
+          var isOnlyfans = cur.title?.text === '仅粉丝可见' || cur.title?.text === '好友圈' // 仅粉丝可见标题
+          var isNotSpescialPrUser = isNotPrUser && !cur.title // 有一些特殊的is_controlled_by_server为1，但是属于推广类的
+
           // 热搜允许展示未关注人
-          if (isHot || cur.user.following || cur.screen_name_suffix_new) {
+          if (isHot || isFollowing || isOnlyfans || isNotSpescialPrUser) {
             var myText = cur.text || ''
             var ngWordInMyText =
               containsNgWord(myText) ||
@@ -651,7 +656,7 @@
         } else {
           res.statuses = filterStatuses(
             res.statuses,
-            url.includes('/hottimeline')
+            url.includes('/hottimeline') // 判断是否热搜页面
           )
         }
       } else if (url.includes('/buildComments')) {
