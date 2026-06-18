@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name              去广告&关键词屏蔽
 // @namespace         Violentmonkey Scripts
-// @version           4.7
+// @version           4.8
 // @description       去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @description:zh    去除“全部关注”和“最新微博”列表中的广告&屏蔽包含设置的关键词的微博/用户
 // @author            fbz
@@ -157,6 +157,7 @@
   .my-dialog .my-dialog__footer {
     padding: 0px 16px 24px 16px;
     margin-top: 40px;
+    text-align: center;
   }
 
   #ngList {
@@ -340,7 +341,14 @@
       <div id="ngList"></div>
       <p class="tips">注：1. 可过滤包含屏蔽词的用户、微博、评论、热搜。 2. 关键词保存在本地的local storage中。 3. 更改关键词后刷新页面生效（不刷新页面的情况下，只有之后加载的微博才会生效）。</p>
     </div>
-    <div class="my-dialog__footer"></div>
+    <div class="my-dialog__footer">
+      <button type="button" class="el-button" id="import_btn">
+        <span>导入</span>
+      </button>
+      <button type="button" class="el-button" id="export_btn">
+        <span>导出</span>
+      </button>
+    </div>
   </div>
 `
 
@@ -362,6 +370,7 @@
   }
 
   var NgListKey = 'NgList'
+  var NgListImportBackupKey = 'NgListBackupBeforeImport'
 
   var apiBlackList = ['/female_version.mp3', '/intake/v2/rum/events'] // 接口黑名单
 
@@ -393,6 +402,113 @@
     }
   }
 
+  function padTime(value) {
+    return value < 10 ? '0' + value : '' + value
+  }
+
+  function getExportFileName() {
+    var now = new Date()
+    return 'weibo-ng-list-' +
+      now.getFullYear() +
+      padTime(now.getMonth() + 1) +
+      padTime(now.getDate()) +
+      '-' +
+      padTime(now.getHours()) +
+      padTime(now.getMinutes()) +
+      padTime(now.getSeconds()) +
+      '.json'
+  }
+
+  function normalizeNgList(list) {
+    if (!Array.isArray(list)) {
+      throw new Error('文件内容必须是 JSON 数组')
+    }
+
+    var result = []
+    var seen = new Set()
+    for (var item of list) {
+      if (typeof item !== 'string') {
+        throw new Error('屏蔽词列表只能包含字符串')
+      }
+
+      var word = item.trim()
+      if (!word) {
+        throw new Error('屏蔽词不能为空')
+      }
+
+      if (!seen.has(word)) {
+        seen.add(word)
+        result.push(word)
+      }
+    }
+
+    return result
+  }
+
+  // 导出屏蔽词列表
+  function exportNgList() {
+    try {
+      var list = normalizeNgList(getNgList() || [])
+      var blob = new Blob([JSON.stringify(list, null, 2)], {
+        type: 'application/json;charset=utf-8',
+      })
+      var url = URL.createObjectURL(blob)
+      var link = document.createElement('a')
+      link.href = url
+      link.download = getExportFileName()
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      setTimeout(function () {
+        URL.revokeObjectURL(url)
+      }, 0)
+    } catch (error) {
+      alert('导出失败：' + error.message)
+    }
+  }
+
+  // 导入屏蔽词列表
+  function importNgList() {
+    if (!confirm('导入会覆盖当前屏蔽词列表，是否继续？')) {
+      return
+    }
+
+    var fileInput = document.createElement('input')
+    fileInput.type = 'file'
+    fileInput.accept = 'application/json,.json'
+    fileInput.addEventListener('change', function (event) {
+      var file = event.target.files && event.target.files[0]
+      if (!file) return
+
+      var reader = new FileReader()
+      reader.onload = function () {
+        var backupList = Array.isArray(data.ngList) ? data.ngList.slice() : []
+
+        try {
+          var parsedList = JSON.parse(reader.result)
+          var normalizedList = normalizeNgList(parsedList)
+          localStorage.setItem(NgListImportBackupKey, JSON.stringify(backupList))
+
+          try {
+            data.ngList = normalizedList
+          } catch (writeError) {
+            data.ngList = backupList
+            throw writeError
+          }
+
+          alert('导入成功，共导入 ' + normalizedList.length + ' 个屏蔽词。导入前列表已备份到 localStorage：' + NgListImportBackupKey)
+        } catch (error) {
+          alert('导入失败：' + error.message)
+        }
+      }
+      reader.onerror = function () {
+        alert('导入失败：文件读取失败')
+      }
+      reader.readAsText(file, 'utf-8')
+    })
+    fileInput.click()
+  }
+
   // 初始化dialog
   function initDialog() {
     var wrapper = document.createElement('div')
@@ -411,10 +527,16 @@
       // 添加关键词按钮点击事件
       var ngWord_input = document.querySelector('#ngWord_input')
 
-      if (ngWord_input && ngWord_input.value) {
+      if (ngWord_input && ngWord_input.value.trim()) {
         data.ngList = ngList.concat([ngWord_input.value.trim()])
         ngWord_input.value = ''
       }
+    })
+    document.querySelector('#import_btn').addEventListener('click', function () {
+      importNgList()
+    })
+    document.querySelector('#export_btn').addEventListener('click', function () {
+      exportNgList()
     })
   }
   // 显示dialog
@@ -429,13 +551,9 @@
 
   // 把屏蔽词列表添加到弹窗中
   function setNgListToDom(list) {
-    var nodeStr = ''
-    for (var [i, item] of list.entries()) {
-      nodeStr += `<span class="ng_item">${item}<i class="close-icon" data-index=${i}></i></span>`
-    }
     var ngListNode = document.querySelector('#ngList')
     if (ngListNode) {
-      ngListNode.innerHTML = nodeStr
+      ngListNode.innerHTML = ''
 
       var onDel = (i) => {
         // 删除关键词
@@ -443,11 +561,21 @@
         arr.splice(i, 1)
         data.ngList = arr || []
       }
-      var delBtnList = ngListNode.querySelectorAll('.close-icon')
-      for (let [i, node] of delBtnList.entries()) {
-        node.addEventListener('click', function (el) {
+
+      for (let [i, item] of list.entries()) {
+        var itemNode = document.createElement('span')
+        itemNode.classList.add('ng_item')
+        itemNode.textContent = item
+
+        var closeNode = document.createElement('i')
+        closeNode.classList.add('close-icon')
+        closeNode.dataset.index = i
+        closeNode.addEventListener('click', function (el) {
           onDel(Number(el.target.dataset.index))
         })
+
+        itemNode.appendChild(closeNode)
+        ngListNode.appendChild(itemNode)
       }
     }
   }
