@@ -9,6 +9,7 @@
 // @exclude           *://weibo.com/tv*
 // @grant             none
 // @noframes
+// @run-at            document-start
 // @require           https://unpkg.com/ajax-hook@3.0.3/dist/ajaxhook.js
 // @require           https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js
 // @downloadURL https://update.greasyfork.org/scripts/428144/%E5%8E%BB%E5%B9%BF%E5%91%8A%E5%85%B3%E9%94%AE%E8%AF%8D%E5%B1%8F%E8%94%BD.user.js
@@ -374,11 +375,28 @@
 
   var apiBlackList = ['/female_version.mp3', '/intake/v2/rum/events'] // 接口黑名单
 
+  // 尽早安装 XHR 拦截，避免错过微博首屏接口。
+  initHook()
+
+  function safeParseJson(str, fallback, silent) {
+    if (!str) return fallback
+    try {
+      return JSON.parse(str)
+    } catch (e) {
+      if (!silent) {
+        console.warn('去广告&关键词屏蔽：JSON 解析失败，已跳过', e)
+      }
+      return fallback
+    }
+  }
+
   // 获取屏蔽词列表
   function getNgList() {
     // return JSON.parse(localStorage.getItem(NgListKey))
     var res = Cookies.get(NgListKey, { domain: '.weibo.com' })
-    return res ? JSON.parse(res) : res
+    if (!res) return res
+    var list = safeParseJson(res, [])
+    return Array.isArray(list) ? list : []
   }
 
   // 设置屏蔽词值
@@ -394,7 +412,7 @@
   // 初始化屏蔽词
   function initNgList() {
     // 从localhost同步到cookies
-    var initList = JSON.parse(localStorage.getItem(NgListKey))
+    var initList = safeParseJson(localStorage.getItem(NgListKey), [])
     if (initList && initList.length > 0) {
       setNgList(initList)
     } else {
@@ -615,81 +633,120 @@
     hotObserverInit()
   })
 
-  // 创建首页观察器
-  function appObserverInit() {
-    var targetNode = document.getElementById('app')
-    // 观察器的配置（需要观察什么变动）
-    var config = {
+  function waitForTarget(getTarget, onTargetReady) {
+    var targetNode = getTarget()
+    if (targetNode) {
+      onTargetReady(targetNode)
+      return
+    }
+
+    var observer = new MutationObserver(function () {
+      targetNode = getTarget()
+      if (targetNode) {
+        observer.disconnect()
+        onTargetReady(targetNode)
+      }
+    })
+
+    observer.observe(document.documentElement, {
       childList: true,
       subtree: true,
-    }
-    // 当观察到变动时执行的回调函数
-    var callback = function (mutationsList, observer) {
-      var audioList = document.querySelectorAll('.AfterPatch_bg_34rqc')
-      for (var audio of audioList) {
-        audio.remove()
-        console.log('移除了弱智三连')
+    })
+  }
+
+  // 创建首页观察器
+  function appObserverInit() {
+    waitForTarget(
+      function () {
+        return document.getElementById('app')
+      },
+      function (targetNode) {
+        // 观察器的配置（需要观察什么变动）
+        var config = {
+          childList: true,
+          subtree: true,
+        }
+        // 当观察到变动时执行的回调函数
+        var callback = function () {
+          var audioList = document.querySelectorAll('.AfterPatch_bg_34rqc')
+          for (var audio of audioList) {
+            audio.remove()
+            console.log('移除了弱智三连')
+          }
+        }
+
+        // 创建一个观察器实例并传入回调函数
+        var observer = new MutationObserver(callback)
+
+        // 以上述配置开始观察目标节点
+        observer.observe(targetNode, config)
+        callback()
       }
-    }
-
-    // 创建一个观察器实例并传入回调函数
-    var observer = new MutationObserver(callback)
-
-    // 以上述配置开始观察目标节点
-    targetNode && observer.observe(targetNode, config)
+    )
   }
   // 搜索页观察器
   function searchObserverInit() {
-    var targetNode = document.getElementById('pl_feedlist_index')
-    // 观察器的配置（需要观察什么变动）
-    var config = {
-      childList: true,
-      subtree: true,
-    }
-    // 当观察到变动时执行的回调函数
-    var callback = function (mutationsList, observer) {
-      var searchList = targetNode.querySelectorAll('.card-wrap')
-      for (var search of searchList) {
-        var text = search.innerText
-        if (ngList.some((word) => text.includes(word))) {
-          search.style.display = 'none'
+    waitForTarget(
+      function () {
+        return document.getElementById('pl_feedlist_index')
+      },
+      function (targetNode) {
+        // 观察器的配置（需要观察什么变动）
+        var config = {
+          childList: true,
+          subtree: true,
         }
-      }
-    }
+        // 当观察到变动时执行的回调函数
+        var callback = function () {
+          var searchList = targetNode.querySelectorAll('.card-wrap')
+          var currentNgList = ngList || []
+          for (var search of searchList) {
+            var text = search.innerText
+            if (currentNgList.some((word) => text.includes(word))) {
+              search.style.display = 'none'
+            }
+          }
+        }
 
-    // 创建一个观察器实例并传入回调函数
-    var observer = new MutationObserver(callback)
-    // 以上述配置开始观察目标节点
-    if (targetNode) {
-      observer.observe(targetNode, config)
-      // 手动让搜索页变化，触发观察器
-      var span = document.createElement('span')
-      targetNode.appendChild(span)
-    }
+        // 创建一个观察器实例并传入回调函数
+        var observer = new MutationObserver(callback)
+        // 以上述配置开始观察目标节点
+        observer.observe(targetNode, config)
+        callback()
+      }
+    )
   }
   // 热搜页观察器
   function hotObserverInit() {
-    var targetNode = document.getElementsByClassName('Main_full_1dfQX')[0]
-    // 观察器的配置（需要观察什么变动）
-    var config = {
-      childList: true,
-      subtree: true,
-    }
-    // 当观察到变动时执行的回调函数
-    var callback = function (mutationsList, observer) {
-      var hotList = targetNode.querySelectorAll('.vue-recycle-scroller__item-view')
-      for (var hot of hotList) {
-        var text = hot.innerText
-        if (ngList.some((word) => text.includes(word))) {
-          hot.style.opacity = 0
+    waitForTarget(
+      function () {
+        return document.getElementsByClassName('Main_full_1dfQX')[0]
+      },
+      function (targetNode) {
+        // 观察器的配置（需要观察什么变动）
+        var config = {
+          childList: true,
+          subtree: true,
         }
-      }
-    }
+        // 当观察到变动时执行的回调函数
+        var callback = function () {
+          var hotList = targetNode.querySelectorAll('.vue-recycle-scroller__item-view')
+          var currentNgList = ngList || []
+          for (var hot of hotList) {
+            var text = hot.innerText
+            if (currentNgList.some((word) => text.includes(word))) {
+              hot.style.opacity = 0
+            }
+          }
+        }
 
-    // 创建一个观察器实例并传入回调函数
-    var observer = new MutationObserver(callback)
-    // 以上述配置开始观察目标节点
-    targetNode && observer.observe(targetNode, config)
+        // 创建一个观察器实例并传入回调函数
+        var observer = new MutationObserver(callback)
+        // 以上述配置开始观察目标节点
+        observer.observe(targetNode, config)
+        callback()
+      }
+    )
   }
 
   var ngList = getNgList() // 屏蔽词列表
@@ -704,17 +761,20 @@
     // 请求过滤方法
     var url =
       typeof response.responseURL === 'string' ? response.responseURL : ''
-    var res = response.response
+    var rawResponse = response.response
 
-    if (res) {
-      res = JSON.parse(res)
-      var ngList = getNgList()
+    if (rawResponse) {
+      var res = safeParseJson(rawResponse, null, true)
+      if (!res) return rawResponse
+      var ngList = getNgList() || []
       var containsNgWord = (text) =>
         ngList.some((word) => text?.includes(word))
 
       var filterStatuses = (statuses, isHot) => {
         return statuses.reduce((acc, cur) => {
-          var isFollowing = cur.user.following
+          if (!cur) return acc
+          var user = cur.user || {}
+          var isFollowing = user.following
           var isNotPrUser = cur.is_controlled_by_server === "0" // 最新的修改为 0是自己关注的，1是服务器推送的
           var isOnlyfans = cur.title?.text === '仅粉丝可见' || cur.title?.text === '好友圈' // 仅粉丝可见标题
 
@@ -744,13 +804,14 @@
 
       var filterComments = (comments) => {
         return comments.reduce((acc, cur) => {
+          if (!cur) return acc
           if (
             !containsNgWord(cur.text) &&
             !(cur.user?.screen_name && containsNgWord(cur.user.screen_name))
           ) {
-            if (cur.comments) {
+            if (Array.isArray(cur.comments)) {
               cur.comments = filterComments(cur.comments)
-            } else if (cur.reply_comment?.comment_badge) {
+            } else if (Array.isArray(cur.reply_comment?.comment_badge)) {
               cur.reply_comment.comment_badge = filterComments(
                 cur.reply_comment.comment_badge
               )
@@ -763,6 +824,7 @@
 
       var filterSearchBand = (searchBands) => {
         return searchBands.reduce((acc, cur) => {
+          if (!cur) return acc
           if (!containsNgWord(cur.word)) {
             acc.push(cur)
           }
@@ -771,6 +833,7 @@
       }
       var filterNews = (news) => {
         return news.reduce((acc, cur) => {
+          if (!cur) return acc
           if (!containsNgWord(cur.topic)) {
             acc.push(cur)
           }
@@ -779,32 +842,45 @@
       }
       if (url.includes('/friendstimeline') || url.includes('/unreadfriendstimeline') || url.includes('/hottimeline') || url.includes('/groupstimeline')) {
         if (url.includes('m.weibo.cn')) {
-          res.data.statuses = filterStatuses(res.data.statuses)
-        } else {
+          if (res.data && Array.isArray(res.data.statuses)) {
+            res.data.statuses = filterStatuses(res.data.statuses)
+          }
+        } else if (Array.isArray(res.statuses)) {
           res.statuses = filterStatuses(
             res.statuses,
             url.includes('/hottimeline') // 判断是否热搜页面
           )
         }
       } else if (url.includes('/buildComments')) {
-        res.data = filterComments(res.data)
+        if (Array.isArray(res.data)) {
+          res.data = filterComments(res.data)
+        }
       } else if (url.includes('/searchBand') || url.includes('/mineBand') || url.includes('/hotSearch')) {
-        res.data.realtime = filterSearchBand(res.data.realtime)
+        if (res.data && Array.isArray(res.data.realtime)) {
+          res.data.realtime = filterSearchBand(res.data.realtime)
+        }
       } else if (url.includes('/entertainment')) {
-        res.data.band_list = filterSearchBand(res.data.band_list)
+        if (res.data && Array.isArray(res.data.band_list)) {
+          res.data.band_list = filterSearchBand(res.data.band_list)
+        }
       } else if (url.includes('/news')) {
-        res.data.band_list = filterNews(res.data.band_list)
+        if (res.data && Array.isArray(res.data.band_list)) {
+          res.data.band_list = filterNews(res.data.band_list)
+        }
 
       }
 
       return JSON.stringify(res)
     }
+
+    return rawResponse
   }
   function initHook() {
+    if (!window.ah || typeof ah.hook !== 'function') return
     ah.hook({
       onloadend: function (xhr) {
         //拦截回调
-        this.responseText = responseFilter(xhr)
+        this.responseText = responseFilter(xhr) || this.responseText
       },
       open: function (arg, xhr) {
         var url = arg[1] || ''
@@ -813,5 +889,4 @@
       }
     })
   }
-  initHook()
 })()
